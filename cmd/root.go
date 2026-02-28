@@ -1,51 +1,95 @@
 /*
 Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
-	"github.com/spf13/cobra"
+	tea "charm.land/bubbletea/v2"
 )
 
-
-
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "plex",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+type model struct {
+	choices  []string
+	cursor   int
+	selected map[int]struct{}
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
+func (m model) Init() tea.Cmd {
+	return nil
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+
+	case tea.KeyPressMsg:
+
+		switch msg.String() {
+
+		case "ctrl+c", "q":
+			return m, tea.Quit
+
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+
+		case "down", "j":
+			if m.cursor < len(m.choices)-1 {
+				m.cursor++
+			}
+
+		case "enter", "space":
+			_, ok := m.selected[m.cursor]
+			if ok {
+				delete(m.selected, m.cursor)
+			} else {
+				m.selected[m.cursor] = struct{}{}
+			}
+		}
+	}
+
+	return m, nil
+}
+
+func (m model) View() tea.View {
+	var s strings.Builder
+	s.WriteString("What should we buy at the market?\n\n")
+
+	for i, choice := range m.choices {
+
+		cursor := " "
+		if m.cursor == i {
+			cursor = ">"
+		}
+
+		checked := " "
+		if _, ok := m.selected[i]; ok {
+			checked = "x"
+		}
+
+		fmt.Fprintf(&s, "%s [%s] %s\n", cursor, checked, choice)
+	}
+
+	s.WriteString("\nPress q to quit.\n")
+
+	return tea.NewView(s.String())
+}
+
+func initialModel() model {
+	return model{
+		choices: []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
+
+		selected: make(map[int]struct{}),
 	}
 }
 
-func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.plex.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func Root() {
+	p := tea.NewProgram(initialModel())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
 }
-
-
